@@ -1,0 +1,34 @@
+component Permission {
+  let u : Integer; ** User
+  let g : Integer; ** Group
+  let o : Integer; ** Others
+}
+
+component User {
+  let id : Integer;
+  let homedir : String;
+  let name : String;
+}
+
+component File {
+  let owner : User;
+  let path : String;
+  let permission : Permission;
+}
+
+let 700_p = Permission { u <- 7; g <- 0; o <- 0; };
+let 644_p = Permission { u <- 6; g <- 4; o <- 4; };
+let 600_p = Permission { u <- 6; g <- 0; o <- 0; };
+
+for all (file : File) {
+  String.ends_with(file.path, "/.ssh") => (file.permission = 700_p);
+  String.contains(file.path, "/.ssh/") =>
+    if String.ends_with(file.path, ".pub")
+    then file.permission = 644_p
+    else file.permission = 600_p;
+};
+
+let file_1 = File {}; ** Valid
+let file_2 = File { path <- "/root/test"; permission <- 700_p; }; ** Valid
+**let file_3 = File { path <- "/root/.ssh/test"; permission <- 700_p; };
+  ** Invalid

@@ -1,0 +1,63 @@
+(include_subdirs qualified)
+
+(library
+ (name cl1_compiler)
+ (libraries str unix menhirLib z3 tsort)
+ (preprocess (pps visitors.ppx ppx_inline_module ppx_macro ppx_string ppx_map))
+)
+
+(ocamllex lexer)
+
+(menhir
+ (modules grammar/args grammar/bool grammar/parser grammar/primitives grammar/scopes
+          grammar/structures grammar/typing grammar/typing.lhs grammar/typing.lhs_ty
+          grammar/typing.rhs grammar/typing.rhs_ty grammar/util grammar/values.lhs
+          grammar/values.rhs grammar/z3)
+ (merge_into parser_impl)
+ (flags --table --explain)
+)
+
+(rule
+ (deps ;parser.messages.check
+  (:mlys (glob_files grammar/*.mly)))
+ (target parser_errors.ml)
+ (action
+  (with-stdout-to
+   %{target}
+   (run menhir --table --explain --base parser_impl %{mlys} --compile-errors %{dep:parser.messages})
+  )
+ )
+)
+
+(rule
+ (deps (glob_files grammar/*.mly))
+ (target parser.messages.new)
+ (action
+  (with-stdout-to
+   %{target}
+   (run menhir --base parser_impl %{deps} --list-errors)
+  )
+ )
+)
+
+;(rule
+; (deps (glob_files grammar/*.mly))
+; (target parser.messages.check)
+; (action
+;  (with-stdout-to
+;   %{target}
+;   (run menhir --base parser_impl %{deps} --compare-errors %{dep:parser.messages.new} --compare-errors %{dep:parser.messages})
+;  )
+; )
+;)
+;
+;(rule
+; (deps (glob_files grammar/*.mly))
+; (target parser.messages.updated)
+; (action
+;  (with-stdout-to
+;   %{target}
+;   (run menhir --base parser_impl --update-errors %{dep:parser.messages} %{deps})
+;  )
+; )
+;)

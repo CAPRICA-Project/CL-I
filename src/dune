@@ -1,0 +1,5 @@
+(executable
+ (name clc)
+ (modules Clc)
+ (libraries cl1_compiler)
+)

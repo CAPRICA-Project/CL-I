@@ -1,0 +1,100 @@
+**FIXME**
+component Z3 {
+    type Relation;
+}
+*********
+
+component Virt {
+    let <<has affinity with>> : Z3.Relation.Equivalence;
+    let <<has antiaffinity with>> : Z3.Relation.Symmetric;
+    let <<can have affinity with>> : Z3.Relation.Equivalence;
+    let <<can have antiaffinity with>> : Z3.Relation.Symmetric;
+}
+
+component Node {
+    let virts : Virt*;
+}
+
+component Group {
+    let nodes : Node*;
+    let virts : Virt*;
+    let fallbacks : Boolean;
+    let is_restricted : Boolean;
+
+    for all (node : Node, virt : Virt)
+    {
+        ** Physical membership
+        (nodes <<has>> node and virts <<has>> virt) => node.virts <<can have>> virt;
+
+        ** Restriction
+        (nodes !<<has>> node and virts <<has>> virt and is_restricted) => node.virts !<<can have>> virt;
+    };
+}
+
+component Cluster {
+    let nodes : Node*;
+    let groups : Group*;
+
+    for all (group : Group, virt : Virt)
+    {
+        (groups <<has>> group and group.virts <<has>> virt) =>
+            exists (node : Node)
+            {
+                 nodes <<has>> node;
+                 node.virts <<has>> virt;
+            };
+
+        ** Non-restriction
+        for all (node : Node)
+        {
+            (groups <<has>> group and nodes <<has>> node and group.virts <<has>> virt and !group.is_restricted) => node.virts <<can have>> virt;
+        };
+    };
+}
+
+** Node affinity
+for all (node_1 : Node, node_2 : Node, virt_1 : Virt, virt_2 : Virt)
+{
+    (virt_1 != virt_2 and node_1.virts <<can have>> virt_1 and node_2.virts <<can have>> virt_2 and virt_1 <<has affinity with>> virt_2) => (node_1 = node_2);
+    (node_1.virts <<has>> virt_1 and node_2.virts <<has>> virt_2 and virt_1 <<can have affinity with>> virt_2) => (node_1 = node_2);
+};
+
+** Node antiaffinity
+for all (node_1 : Node, node_2 : Node, virt_1 : Virt, virt_2 : Virt)
+{
+    (virt_1 != virt_2 and node_1.virts <<can have>> virt_1 and node_2.virts <<can have>> virt_2 and virt_1 <<has antiaffinity with>> virt_2) => (node_1 != node_2);
+    (node_1.virts <<has>> virt_1 and node_2.virts <<has>> virt_2 and virt_1 <<can have antiaffinity with>> virt_2) => (node_1 != node_2);
+};
+
+
+let node0 = Node();
+let node1 = Node();
+let node2 = Node();
+assert (node0 != node1);
+assert (node1 != node2);
+assert (node0 != node2);
+
+let ct100 = Virt(); let ct101 = Virt();
+let ct102 = Virt(); let ct103 = Virt();
+let ct104 = Virt();
+
+let group0 = Group { nodes <- [node0; node1];
+                     virts <- [ct100; ct104];
+                     is_restricted <- true; };
+let group1 = Group { nodes <- [node1; node2];
+                     virts <- [ct101];
+                     is_restricted <- true; };
+let group2 = Group { nodes <- [node2];
+                     virts <- [ct102; ct103];
+                     is_restricted <- true; };
+
+let cluster = Cluster {
+  nodes <- [node0; node1; node2];
+  groups <- [group0; group1; group2];
+};
+
+assert (ct100 <<can have affinity with>> ct101);
+**assert (ct104 <<can have affinity with>> ct101);
+**assert (ct101 <<can have affinity with>> ct102);
+**assert (ct100 <<can have affinity with>> ct101);
+**assert (ct100 <<has antiaffinity with>> ct103);
